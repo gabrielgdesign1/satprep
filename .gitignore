@@ -1,0 +1,29 @@
+# secrets
+.env
+.env.local
+.env*.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ingestion artifacts
+ingestion/out/
+ingestion/cache/
+
+# node / next
+node_modules/
+.next/
+out/
+build/
+.vercel
+
+# os
+Thumbs.db
+.DS_Store
+
+# PDFs oficiais do College Board: material de terceiros, 45 MB.
+# Ficam so na maquina local; o pipeline os le daqui.
+pdfs/
