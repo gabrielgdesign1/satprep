@@ -91,7 +91,10 @@ def append(path, record):
 
 
 def save_asset(doc, page_no, bbox, name) -> dict:
-    png = render_crop(doc, page_no, bbox, zoom=ASSET_ZOOM, tight=False)
+    # tight=True encolhe ate o desenho real. Sem isso, a ULTIMA linha de
+    # alternativas graficas vai ate o rodape da coluna e o PNG sai com o dobro
+    # da altura, so de espaco em branco.
+    png = render_crop(doc, page_no, bbox, zoom=ASSET_ZOOM, tight=True)
     path = ASSETS / f"{name}.png"
     path.write_bytes(png)
     return {
