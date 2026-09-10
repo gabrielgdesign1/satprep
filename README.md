@@ -11,38 +11,47 @@ web/          app Next.js
 
 ## Estado atual
 
+No ar em **https://web-amber-kappa-30.vercel.app**
+
 | item | situação |
 |---|---|
 | Segmentação das questões | **960/960**, sequência contígua nas 8 provas |
-| Gabaritos casados | **960/960** (106 múltipla escolha + 14 grid-in por prova) |
-| Extraídas por visão | **33** — parou por falta de crédito na API da Anthropic |
-| Carregadas no banco | 6 (conjunto de demonstração) |
-| App | completo e testado ponta a ponta |
+| Gabaritos casados | **960/960** |
+| Reading & Writing no banco | **522 de 528** — extraídas offline, sem API |
+| Math no banco | **33 de 432** — parou por falta de crédito na API |
+| **Total jogável** | **555 questões** |
+| App | completo, testado em produção |
 
-## Como retomar de onde parou
+R&W está praticamente completo porque não precisa de IA: o texto do PDF é limpo
+e o enunciado do SAT é formulaico. Só Math depende da API, por causa das
+fórmulas. As 6 questões de R&W que sobraram estão em
+`ingestion/out/rw_needs_vision.jsonl`.
 
-### 1. Créditos na API da Anthropic
+## Os dois pipelines
 
-A ingestão parou em `Your credit balance is too low`. Adicione créditos em
-console.anthropic.com e rode:
+**Reading & Writing — offline, custo zero.** Não chama API nenhuma:
 
 ```bash
-cd ingestion && python ingest.py
+cd ingestion && python ingest_rw.py
 ```
 
-É resumível: só processa o que ainda falta. Projeção medida para as 960:
-**~7,0M tokens de entrada e ~1,24M de saída**. O padrão é `claude-sonnet-5`
-(em `.env`); depois vale refinar os casos duvidosos com Opus:
+**Math — precisa da API da Anthropic.** É o único que consome crédito:
+
+```bash
+cd ingestion && python ingest.py --tests 4 5 6 7 8 9 10 11
+```
+
+É resumível: só processa o que ainda falta. Restam 399 questões de Math.
+O padrão é `claude-sonnet-5` (em `.env`). Depois vale refinar os duvidosos:
 
 ```bash
 cd ingestion && python ingest.py --retry-low
 ```
 
-### 2. Chave `service_role` do Supabase
+## Carregar no banco
 
-Para carregar as 960 no banco. Pegue em
-Supabase → Project Settings → API → `service_role`, coloque em `.env` como
-`SUPABASE_SERVICE_ROLE_KEY`, e rode:
+Com a `service_role` (Supabase → Project Settings → API) em `.env` como
+`SUPABASE_SERVICE_ROLE_KEY`:
 
 ```bash
 cd ingestion && python push_db.py
@@ -50,15 +59,34 @@ cd ingestion && python push_db.py
 
 Use `--dry-run` antes para conferir sem escrever nada.
 
-### 3. Rodar o app
+> A carga das 555 atuais foi feita por `load_via_rpc.py`, que usava uma função
+> `security definer` temporária no banco porque a `service_role` não estava
+> disponível. **Essa função já foi removida.** Prefira `push_db.py`.
+
+## Rodar o app
 
 ```bash
 cd web && npm run dev
 ```
 
+## Publicar
+
+```bash
+cd web && npx vercel deploy --temporary --yes --prod
+```
+
+O ideal é conectar o repo ao projeto na Vercel (Settings → Git, com
+**Root Directory = `web`**); aí todo push publica sozinho.
+
 ## Decisões que valem lembrar
 
-**Extração por visão, não por regex.** No PDF as fórmulas de Math vêm
+**Visão só onde ela é necessária.** Reading & Writing sai por extração de
+texto e classificação por regra, sem API: o texto do PDF é limpo e o enunciado
+do SAT é formulaico (quatro perguntas cobrem 59% das questões). A validação é
+estatística — a distribuição por domínio ficou em 29/25/24/22%, contra os
+~26/28/26/20% do blueprint oficial do College Board.
+
+**Math é que precisa de visão.** No PDF as fórmulas vêm
 desmontadas em fragmentos posicionados — numerador e denominador viram spans
 separados, expoentes só se distinguem por delta-Y. Reconstruir LaTeX por regra
 erra fração, radical e matriz. O pipeline recorta a questão como imagem, o
